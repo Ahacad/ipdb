@@ -10,7 +10,7 @@ import sys
 
 from contextlib import contextmanager
 
-__version__ = '0.13.3.dev0'
+__version__ = '0.13.5.dev0'
 
 from IPython import get_ipython
 from IPython.core.debugger import BdbQuit_excepthook
@@ -47,7 +47,9 @@ else:
 debugger_cls = shell.debugger_cls
 
 
-def _init_pdb(context=3, commands=[]):
+def _init_pdb(context=None, commands=[]):
+    if context is None:
+        context = os.getenv("IPDB_CONTEXT_SIZE", get_context_from_config())
     try:
         p = debugger_cls(context=context)
     except TypeError:
@@ -64,12 +66,10 @@ def wrap_sys_excepthook():
         sys.excepthook = BdbQuit_excepthook
 
 
-def set_trace(frame=None, context=None):
+def set_trace(frame=None, context=None, cond=True):
+    if not cond:
+        return
     wrap_sys_excepthook()
-    if not context:
-        context = os.environ.get(
-            "IPDB_CONTEXT_SIZE", get_context_from_config()
-        )
     if frame is None:
         frame = sys._getframe().f_back
     p = _init_pdb(context).set_trace(frame)
@@ -217,7 +217,7 @@ def launch_ipdb_on_exception():
 
 
 _usage = """\
-usage: python -m ipdb [-c command] ... pyfile [arg] ...
+usage: python -m ipdb [-m] [-c command] ... pyfile [arg] ...
 
 Debug the Python program given by pyfile.
 
@@ -228,6 +228,9 @@ and in the current directory, if they exist.  Commands supplied with
 To let the script run until an exception occurs, use "-c continue".
 To let the script run up to a given line X in the debugged file, use
 "-c 'until X'"
+
+Option -m is available only in Python 3.7 and later.
+
 ipdb version %s.""" % __version__
 
 
@@ -242,29 +245,36 @@ def main():
         class Restart(Exception):
             pass
 
-    opts, args = getopt.getopt(sys.argv[1:], 'hc:', ['help', 'command='])
+    if sys.version_info >= (3, 7):
+        opts, args = getopt.getopt(sys.argv[1:], 'mhc:', ['help', 'command='])
+    else:
+        opts, args = getopt.getopt(sys.argv[1:], 'hc:', ['help', 'command='])
 
     commands = []
+    run_as_module = False
     for opt, optarg in opts:
         if opt in ['-h', '--help']:
             print(_usage)
             sys.exit()
         elif opt in ['-c', '--command']:
             commands.append(optarg)
+        elif opt in ['-m']:
+            run_as_module = True
 
     if not args:
         print(_usage)
         sys.exit(2)
 
     mainpyfile = args[0]     # Get script filename
-    if not os.path.exists(mainpyfile):
+    if not run_as_module and not os.path.exists(mainpyfile):
         print('Error:', mainpyfile, 'does not exist')
         sys.exit(1)
 
     sys.argv = args     # Hide "pdb.py" from argument list
 
     # Replace pdb's dir with script's dir in front of module search path.
-    sys.path[0] = os.path.dirname(mainpyfile)
+    if not run_as_module:
+        sys.path[0] = os.path.dirname(mainpyfile)
 
     # Note on saving/restoring sys.argv: it's a good idea when sys.argv was
     # modified by the script being debugged. It's a bad idea when it was
@@ -273,7 +283,10 @@ def main():
     pdb = _init_pdb(commands=commands)
     while 1:
         try:
-            pdb._runscript(mainpyfile)
+            if run_as_module:
+                pdb._runmodule(mainpyfile)
+            else:
+                pdb._runscript(mainpyfile)
             if pdb._user_requested_quit:
                 break
             print("The program finished and will be restarted")

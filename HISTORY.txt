@@ -1,10 +1,27 @@
 Changelog
 =========
 
-0.13.3 (unreleased)
+0.13.5 (unreleased)
 -------------------
 
 - Nothing changed yet.
+
+
+0.13.4 (2020-10-01)
+-------------------
+
+- Add '-m' option
+  [mrmino]
+
+
+0.13.3 (2020-06-23)
+-------------------
+
+- Allow runcall, runeval to also use set context value
+  [meowser]
+
+- Add condition argument to set_trace
+  [alexandrebarbaruiva]
 
 
 0.13.2 (2020-03-03)
@@ -24,7 +41,7 @@ Changelog
 0.13.0 (2020-02-28)
 -------------------
 
-- Add option to set context via environment variable or configuration file.
+- Add option to set context via environment variable or configuration file
   [alexandrebarbaruiva]
 
 
